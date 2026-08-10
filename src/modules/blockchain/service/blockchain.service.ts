@@ -65,7 +65,10 @@ export class BlockchainService {
       const confirmations = currentBlock - receipt.blockNumber;
 
       // Get required confirmations
-      const requiredConfirmations = parseInt(process.env.REQUIRED_CONFIRMATIONS || '12');
+      const requiredConfirmations =
+        network?.toLowerCase() === 'bsc-testnet'
+          ? 1
+          : parseInt(process.env.REQUIRED_CONFIRMATIONS || '12');
       if (confirmations < requiredConfirmations) {
         throw new BadRequestError(BLOCKCHAIN_ERRORS.INSUFFICIENT_CONFIRMATIONS);
       }

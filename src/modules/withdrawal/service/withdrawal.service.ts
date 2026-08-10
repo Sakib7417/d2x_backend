@@ -117,7 +117,7 @@ export class WithdrawalService {
         debit: fee,
         beforeBalance: currentBalance,
         afterBalance: afterFeeBalance,
-        description: `Withdrawal fee (2%)`,
+        description: `Withdrawal fee (20%)`,
         referenceType: 'WITHDRAWAL',
       });
       currentBalance = afterFeeBalance;
