@@ -21,18 +21,20 @@ router.get('/history', authenticate, validateQuery(getTradeSchema), tradingContr
 router.get('/stats', authenticate, tradingController.getStatistics.bind(tradingController));
 
 /**
+ * @route   GET /api/v1/trading/recent
+ * @desc    Get recent completed trades (public activity feed)
+ * @access  Private
+ */
+router.get('/recent', authenticate, tradingController.getRecentTrades.bind(tradingController));
+
+/**
  * @route   GET /api/v1/trading/:id
  * @desc    Get single trade by ID
  * @access  Private
  */
 router.get('/:id', authenticate, tradingController.getTradeById.bind(tradingController));
 
-/**
- * @route   GET /api/v1/trading/recent
- * @desc    Get recent completed trades (public activity feed)
- * @access  Private
- */
-router.get('/recent', authenticate, tradingController.getRecentTrades.bind(tradingController));
+
 
 /**
  * @route   POST /api/v1/trading/execute-session
