@@ -9,8 +9,7 @@ export interface SignupDTO {
   referralCode?: string;
   walletAddress?: string;
   govIdType: GovIdType;
-  govIdFrontUrl: string;
-  govIdBackUrl: string;
+  govIdUrl: string;
 }
 
 export interface LoginDTO {
@@ -27,8 +26,19 @@ export interface ForgotPasswordDTO {
 }
 
 export interface ResetPasswordDTO {
-  token: string;
+  email: string;
+  otp: string;
   newPassword: string;
+}
+
+export interface VerifyEmailDTO {
+  email: string;
+  otp: string;
+}
+
+export interface ResendOtpDTO {
+  email: string;
+  purpose?: 'SIGNUP' | 'PASSWORD_RESET';
 }
 
 export interface ChangePasswordDTO {
@@ -47,8 +57,7 @@ export interface AuthResponse {
     autoTradeStatus: boolean;
     status: UserStatus;
     govIdType: GovIdType | null;
-    govIdFrontUrl: string | null;
-    govIdBackUrl: string | null;
+    govIdUrl: string | null;
   };
   tokens: {
     accessToken: string;

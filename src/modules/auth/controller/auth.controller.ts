@@ -1,44 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../service/auth.service';
-import { SignupInput, LoginInput, RefreshTokenInput, ForgotPasswordInput, ResetPasswordInput, ChangePasswordInput } from '../validator/auth.validator';
+import { SignupInput, LoginInput, RefreshTokenInput, ForgotPasswordInput, ResetPasswordInput, ChangePasswordInput, VerifyEmailInput, ResendOtpInput } from '../validator/auth.validator';
 import { BadRequestError } from '../../../utils/errors';
 import { AUTH_ERRORS } from '../constants/auth.constants';
-import { uploadToCloudinary, CLOUDINARY_FOLDERS } from '../../../config/cloudinary';
+import { uploadToR2, R2_BUCKETS } from '../../../config/storage';
 
 export class AuthController {
   /**
-   * Signup user with government ID (front + back photos).
-   * Both images are uploaded to Cloudinary and their secure URLs persisted.
+   * Signup user with a single government ID photo.
+   * The image is uploaded to Cloudflare R2 and the public URL persisted.
    */
   async signup(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-      const frontFile = files?.govIdFront?.[0];
-      const backFile = files?.govIdBack?.[0];
+      const govIdFile = files?.govId?.[0];
 
-      if (!frontFile) {
-        throw new BadRequestError(AUTH_ERRORS.GOV_ID_FRONT_REQUIRED);
-      }
-      if (!backFile) {
-        throw new BadRequestError(AUTH_ERRORS.GOV_ID_BACK_REQUIRED);
+      if (!govIdFile) {
+        throw new BadRequestError(AUTH_ERRORS.GOV_ID_REQUIRED);
       }
 
-      // Upload both ID images to Cloudinary in parallel.
-      const [frontRes, backRes] = await Promise.all([
-        uploadToCloudinary(frontFile, CLOUDINARY_FOLDERS.KYC),
-        uploadToCloudinary(backFile, CLOUDINARY_FOLDERS.KYC),
-      ]);
+      const govIdUrl = await uploadToR2(govIdFile, R2_BUCKETS.KYC);
 
-      const data: SignupInput & { govIdFrontUrl: string; govIdBackUrl: string } = {
+      const data: SignupInput & { govIdUrl: string } = {
         ...req.body,
-        govIdFrontUrl: frontRes.secure_url,
-        govIdBackUrl: backRes.secure_url,
+        govIdUrl,
       };
 
       const result = await authService.signup(data);
       res.status(201).json({
         success: true,
-        message: 'Account created successfully',
+        message: 'Account created. Please check your email for the verification code.',
         data: result,
       });
     } catch (error) {
@@ -97,6 +88,39 @@ export class AuthController {
   }
 
   /**
+   * Verify email with OTP
+   */
+  async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data: VerifyEmailInput = req.body;
+      const result = await authService.verifyEmail(data.email, data.otp);
+      res.status(200).json({
+        success: true,
+        message: 'Email verified successfully',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Resend email OTP
+   */
+  async resendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data: ResendOtpInput = req.body;
+      await authService.resendOtp(data.email, data.purpose ?? 'SIGNUP');
+      res.status(200).json({
+        success: true,
+        message: 'If an account exists with this email, a verification code has been sent',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Forgot password
    */
   async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -105,7 +129,7 @@ export class AuthController {
       await authService.forgotPassword(data.email);
       res.status(200).json({
         success: true,
-        message: 'If an account exists with this email, a password reset link has been sent',
+        message: 'If an account exists with this email, a password reset code has been sent',
       });
     } catch (error) {
       next(error);
@@ -118,7 +142,7 @@ export class AuthController {
   async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const data: ResetPasswordInput = req.body;
-      await authService.resetPassword(data.token, data.newPassword);
+      await authService.resetPassword(data.email, data.otp, data.newPassword);
       res.status(200).json({
         success: true,
         message: 'Password reset successful',

@@ -46,8 +46,7 @@ const adminUserSelect = {
   deletedAt: true,
   wallets: true,
   govIdType: true,
-  govIdFrontUrl: true,
-  govIdBackUrl: true,
+  govIdUrl: true,
 } as const;
 
 export class AdminRepository {

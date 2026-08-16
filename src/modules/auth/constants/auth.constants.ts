@@ -13,8 +13,11 @@ export const AUTH_ERRORS = {
   ACCOUNT_INACTIVE: 'Account is inactive',
   ACCOUNT_SUSPENDED: 'Account has been suspended',
   GOV_ID_TYPE_REQUIRED: 'Government ID type is required',
-  GOV_ID_FRONT_REQUIRED: 'Government ID front side photo is required',
-  GOV_ID_BACK_REQUIRED: 'Government ID back side photo is required',
+  GOV_ID_REQUIRED: 'Government ID photo is required',
+  EMAIL_NOT_VERIFIED: 'Please verify your email before logging in',
+  INVALID_OTP: 'Invalid or expired OTP',
+  OTP_NOT_FOUND: 'OTP not found or already used',
+  USER_ALREADY_ACTIVE: 'User is already verified',
 } as const;
 
 export const AUTH_SUCCESS = {

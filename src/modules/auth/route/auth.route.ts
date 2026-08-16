@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { authController } from '../controller/auth.controller';
 import { validateRequest } from '../../../middlewares/validation.middleware';
-import { signupSchema, loginSchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema } from '../validator/auth.validator';
+import { signupSchema, loginSchema, refreshTokenSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, verifyEmailSchema, resendOtpSchema } from '../validator/auth.validator';
 import { authenticate } from '../../../middlewares/auth.middleware';
 import { authRateLimiter } from '../../../middlewares/rateLimiter.middleware';
 import { KYC_MAX_FILE_SIZE } from '../constants/auth.constants';
@@ -27,14 +27,13 @@ const kycUpload = multer({
 
 /**
  * @route   POST /api/v1/auth/signup
- * @desc    Register a new user with government ID (front + back photos)
+ * @desc    Register a new user with government ID photo
  * @access  Public
  */
 router.post(
   '/signup',
   kycUpload.fields([
-    { name: 'govIdFront', maxCount: 1 },
-    { name: 'govIdBack', maxCount: 1 },
+    { name: 'govId', maxCount: 1 },
   ]),
   validateRequest(signupSchema),
   authController.signup.bind(authController),
@@ -60,6 +59,20 @@ router.post('/refresh', authRateLimiter, validateRequest(refreshTokenSchema), au
  * @access  Private
  */
 router.post('/logout', authenticate, authController.logout.bind(authController));
+
+/**
+ * @route   POST /api/v1/auth/verify-email
+ * @desc    Verify email with OTP
+ * @access  Public
+ */
+router.post('/verify-email', authRateLimiter, validateRequest(verifyEmailSchema), authController.verifyEmail.bind(authController));
+
+/**
+ * @route   POST /api/v1/auth/resend-otp
+ * @desc    Resend email OTP
+ * @access  Public
+ */
+router.post('/resend-otp', authRateLimiter, validateRequest(resendOtpSchema), authController.resendOtp.bind(authController));
 
 /**
  * @route   POST /api/v1/auth/forgot-password

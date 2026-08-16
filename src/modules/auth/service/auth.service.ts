@@ -130,9 +130,33 @@ export class AuthService {
   }
 
   /**
+   * Generate 6 digit numeric OTP
+   */
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Set and send email OTP
+   */
+  private async createAndSendOtp(user: any, purpose: 'SIGNUP' | 'PASSWORD_RESET'): Promise<void> {
+    const otp = this.generateOtp();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15); // 15 minutes expiry
+
+    await authRepository.setEmailOtp(user.id, otp, expiresAt, purpose);
+
+    if (purpose === 'SIGNUP') {
+      await emailService.sendEmailVerificationOtp(user.email, otp);
+    } else {
+      await emailService.sendPasswordResetOtp(user.email, otp);
+    }
+  }
+
+  /**
    * Signup user
    */
-  async signup(data: SignupDTO): Promise<AuthResponse> {
+  async signup(data: SignupDTO): Promise<{ userId: string; email: string }> {
     // Check if user already exists
     const existingUser = await authRepository.findByEmail(data.email);
     if (existingUser) {
@@ -168,25 +192,73 @@ export class AuthService {
       }
     }
 
-    // Generate tokens
-    const tokens = await this.generateTokens(user);
+    // Send email verification OTP
+    try {
+      await this.createAndSendOtp(user, 'SIGNUP');
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+    }
+
+    return { userId: user.id, email: user.email };
+  }
+
+  /**
+   * Verify email with OTP
+   */
+  async verifyEmail(email: string, otp: string): Promise<AuthResponse> {
+    const user = await authRepository.findByEmail(email);
+    if (!user) {
+      throw new NotFoundError(AUTH_ERRORS.USER_NOT_FOUND);
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestError(AUTH_ERRORS.USER_ALREADY_ACTIVE);
+    }
+
+    if (
+      user.emailOtp !== otp ||
+      user.emailOtpPurpose !== 'SIGNUP' ||
+      !user.emailOtpExpiresAt ||
+      user.emailOtpExpiresAt < new Date()
+    ) {
+      throw new BadRequestError(AUTH_ERRORS.INVALID_OTP);
+    }
+
+    const verifiedUser = await authRepository.verifyEmail(user.id);
+
+    const tokens = await this.generateTokens(verifiedUser);
 
     return {
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role as UserRole,
-        referralCode: user.referralCode,
-        rank: user.rank,
-        autoTradeStatus: user.autoTradeStatus,
-        status: user.status,
-        govIdType: user.govIdType,
-        govIdFrontUrl: user.govIdFrontUrl,
-        govIdBackUrl: user.govIdBackUrl,
+        id: verifiedUser.id,
+        email: verifiedUser.email,
+        name: verifiedUser.name,
+        role: verifiedUser.role as UserRole,
+        referralCode: verifiedUser.referralCode,
+        rank: verifiedUser.rank,
+        autoTradeStatus: verifiedUser.autoTradeStatus,
+        status: verifiedUser.status,
+        govIdType: verifiedUser.govIdType,
+        govIdUrl: verifiedUser.govIdUrl,
       },
       tokens,
     };
+  }
+
+  /**
+   * Resend email OTP
+   */
+  async resendOtp(email: string, purpose: 'SIGNUP' | 'PASSWORD_RESET'): Promise<void> {
+    const user = await authRepository.findByEmail(email);
+    if (!user) {
+      throw new NotFoundError(AUTH_ERRORS.USER_NOT_FOUND);
+    }
+
+    if (purpose === 'SIGNUP' && user.emailVerified) {
+      throw new BadRequestError(AUTH_ERRORS.USER_ALREADY_ACTIVE);
+    }
+
+    await this.createAndSendOtp(user, purpose);
   }
 
   /**
@@ -205,6 +277,11 @@ export class AuthService {
     }
     if (user.status === 'SUSPENDED') {
       throw new ForbiddenError(AUTH_ERRORS.ACCOUNT_SUSPENDED);
+    }
+
+    // Ensure email is verified
+    if (!user.emailVerified) {
+      throw new ForbiddenError(AUTH_ERRORS.EMAIL_NOT_VERIFIED);
     }
 
     // Verify password
@@ -230,8 +307,7 @@ export class AuthService {
         autoTradeStatus: user.autoTradeStatus,
         status: user.status,
         govIdType: user.govIdType,
-        govIdFrontUrl: user.govIdFrontUrl,
-        govIdBackUrl: user.govIdBackUrl,
+        govIdUrl: user.govIdUrl,
       },
       tokens,
     };
@@ -295,50 +371,35 @@ export class AuthService {
       return;
     }
 
-    // Generate password reset token
-    const token = this.generateReferralCode();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
-
-    await authRepository.createPasswordResetToken(user.id, token, expiresAt);
-
-    // Email sending is optional; disabled by default via EMAIL_ENABLED
-    emailService.sendPasswordReset(user.email, token).catch((error) => {
-      console.error('Failed to send password reset email:', error);
-    });
+    await this.createAndSendOtp(user, 'PASSWORD_RESET');
   }
 
   /**
    * Reset password
    */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    // Find password reset token
-    const tokenRecord = await authRepository.findPasswordResetToken(token);
-    if (!tokenRecord) {
-      throw new BadRequestError(AUTH_ERRORS.PASSWORD_RESET_TOKEN_INVALID);
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
+    const user = await authRepository.findByEmail(email);
+    if (!user) {
+      throw new BadRequestError(AUTH_ERRORS.INVALID_OTP);
     }
 
-    // Check if token is already used
-    if (tokenRecord.usedAt) {
-      throw new BadRequestError(AUTH_ERRORS.PASSWORD_RESET_TOKEN_USED);
-    }
-
-    // Check if token is expired
-    if (tokenRecord.expiresAt < new Date()) {
-      throw new BadRequestError(AUTH_ERRORS.PASSWORD_RESET_TOKEN_INVALID);
+    if (
+      user.emailOtp !== otp ||
+      user.emailOtpPurpose !== 'PASSWORD_RESET' ||
+      !user.emailOtpExpiresAt ||
+      user.emailOtpExpiresAt < new Date()
+    ) {
+      throw new BadRequestError(AUTH_ERRORS.INVALID_OTP);
     }
 
     // Hash new password
     const hashedPassword = await this.hashPassword(newPassword);
 
     // Update user password
-    await authRepository.updatePassword(tokenRecord.userId, hashedPassword);
-
-    // Mark token as used
-    await authRepository.markPasswordResetTokenUsed(tokenRecord.id);
+    await authRepository.updatePasswordFromOtp(user.id, hashedPassword);
 
     // Revoke all refresh tokens for security
-    await authRepository.revokeAllUserTokens(tokenRecord.userId, 'Password reset');
+    await authRepository.revokeAllUserTokens(user.id, 'Password reset');
   }
 
   /**

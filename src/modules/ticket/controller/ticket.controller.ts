@@ -2,16 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import { ticketService } from '../service/ticket.service';
 import { AuthRequest } from '../../../middlewares/auth.middleware';
 import { CreateTicketInput, ReplyTicketInput } from '../validator/ticket.validator';
-import { uploadManyToCloudinary, CLOUDINARY_FOLDERS } from '../../../config/cloudinary';
+import { uploadManyToR2, R2_BUCKETS } from '../../../config/storage';
 
 /**
- * Upload attachment files to Cloudinary and return their secure URLs.
+ * Upload attachment files to Cloudflare R2 and return their public URLs.
  * Returns `null` when no files were uploaded so the caller can skip storing
  * an empty array.
  */
 async function buildAttachmentUrls(files: Express.Multer.File[] | undefined): Promise<string[] | null> {
   if (!files || files.length === 0) return null;
-  return uploadManyToCloudinary(files, CLOUDINARY_FOLDERS.TICKETS);
+  return uploadManyToR2(files, R2_BUCKETS.TICKETS);
 }
 
 export class TicketController {

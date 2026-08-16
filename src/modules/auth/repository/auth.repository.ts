@@ -52,8 +52,7 @@ export class AuthRepository {
         sponsorId: data.referralCode ? (await this.findByReferralCode(data.referralCode))?.id : null,
         walletAddress: data.walletAddress,
         govIdType: data.govIdType,
-        govIdFrontUrl: data.govIdFrontUrl,
-        govIdBackUrl: data.govIdBackUrl,
+        govIdUrl: data.govIdUrl,
       },
       include: {
         sponsor: true,
@@ -68,6 +67,51 @@ export class AuthRepository {
     return prisma.user.update({
       where: { id: userId },
       data: { lastLogin: new Date() },
+    });
+  }
+
+  /**
+   * Update user's email OTP fields
+   */
+  async setEmailOtp(userId: string, otp: string, expiresAt: Date, purpose: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailOtp: otp,
+        emailOtpExpiresAt: expiresAt,
+        emailOtpPurpose: purpose,
+      },
+    });
+  }
+
+  /**
+   * Mark email as verified and clear OTP
+   */
+  async verifyEmail(userId: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailVerified: true,
+        status: 'ACTIVE',
+        emailOtp: null,
+        emailOtpExpiresAt: null,
+        emailOtpPurpose: null,
+      },
+    });
+  }
+
+  /**
+   * Update user password and clear password reset OTP
+   */
+  async updatePasswordFromOtp(userId: string, hashedPassword: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+        emailOtp: null,
+        emailOtpExpiresAt: null,
+        emailOtpPurpose: null,
+      },
     });
   }
 

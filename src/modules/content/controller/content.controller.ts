@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { contentService } from '../service/content.service';
 import { CreatePostInput, UpdatePostInput, CreateNewsInput, UpdateNewsInput } from '../validator/content.validator';
 import { AuthRequest } from '../../../middlewares/auth.middleware';
-import { uploadToCloudinary, CLOUDINARY_FOLDERS } from '../../../config/cloudinary';
+import { uploadToR2, R2_BUCKETS } from '../../../config/storage';
 
 export class ContentController {
   // ===== Public endpoints (user) =====
@@ -35,8 +35,7 @@ export class ContentController {
         res.status(400).json({ success: false, message: 'Post image is required' });
         return;
       }
-      const uploaded = await uploadToCloudinary(file, CLOUDINARY_FOLDERS.POSTS);
-      const imageUrl = uploaded.secure_url;
+      const imageUrl = await uploadToR2(file, R2_BUCKETS.POSTS);
       const authorId = req.user?.role === 'ADMIN' ? undefined : req.user?.userId;
       const post = await contentService.createPost({
         title: body.title,
@@ -78,8 +77,7 @@ export class ContentController {
       if (body.isActive !== undefined) data.isActive = body.isActive === 'true' || body.isActive === true;
       if (body.sortOrder !== undefined) data.sortOrder = Number(body.sortOrder);
       if (file) {
-        const uploaded = await uploadToCloudinary(file, CLOUDINARY_FOLDERS.POSTS);
-        data.imageUrl = uploaded.secure_url;
+        data.imageUrl = await uploadToR2(file, R2_BUCKETS.POSTS);
       }
 
       const post = await contentService.updatePost(req.params.id, data);

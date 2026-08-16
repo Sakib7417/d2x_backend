@@ -189,14 +189,17 @@ model User {
   walletAddress    String?
   rank             RankLevel @default(LV1)
   autoTradeStatus  Boolean   @default(false)
-  status           UserStatus @default(ACTIVE)
+  status           UserStatus @default(INACTIVE)
+  emailVerified    Boolean   @default(false) @map("email_verified")
+  emailOtp         String?   @map("email_otp")
+  emailOtpExpiresAt DateTime? @map("email_otp_expires_at")
+  emailOtpPurpose  String?   @map("email_otp_purpose")
   isContentCreator Boolean   @default(false) @map("is_content_creator")
   lastLogin        DateTime?
   sponsorTradeBonusExpiry DateTime? @map("sponsor_trade_bonus_expiry")
   sponsorTradeBonusRate   Float?    @map("sponsor_trade_bonus_rate")
   govIdType        GovIdType? @map("gov_id_type")
-  govIdFrontUrl    String?    @map("gov_id_front_url")
-  govIdBackUrl     String?    @map("gov_id_back_url")
+  govIdUrl         String?    @map("gov_id_url")
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
