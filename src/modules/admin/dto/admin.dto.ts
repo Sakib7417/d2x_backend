@@ -2,7 +2,7 @@ import { UserRole } from '@prisma/client';
 
 export interface UserActionDTO {
   userId: string;
-  action: 'BAN' | 'UNBAN' | 'ACTIVATE' | 'SUSPEND';
+  action: 'BAN' | 'UNBAN' | 'ACTIVATE' | 'SUSPEND' | 'DELETE';
   reason?: string;
 }
 

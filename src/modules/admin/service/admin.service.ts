@@ -99,6 +99,10 @@ export class AdminService {
     if (!user) throw new NotFoundError(ADMIN_ERRORS.USER_NOT_FOUND);
     if (user.role === 'ADMIN') throw new ForbiddenError(ADMIN_ERRORS.CANNOT_MODIFY_ADMIN);
 
+    if (data.action === 'DELETE') {
+      return serializeAdminData(await userRepository.update(data.userId, { deletedAt: new Date() }));
+    }
+
     let status = user.status;
     switch (data.action) {
       case 'BAN':

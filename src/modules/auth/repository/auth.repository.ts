@@ -9,7 +9,7 @@ export class AuthRepository {
    */
   async findByEmail(email: string): Promise<User | null> {
     return prisma.user.findUnique({
-      where: { email },
+      where: { email, deletedAt: null },
       include: {
         sponsor: true,
       },
@@ -30,7 +30,7 @@ export class AuthRepository {
    */
   async findById(id: string): Promise<User | null> {
     return prisma.user.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: {
         sponsor: true,
       },

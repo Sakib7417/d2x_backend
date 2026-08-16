@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const userActionSchema = z.object({
   userId: z.string().uuid(),
-  action: z.enum(['BAN', 'UNBAN', 'ACTIVATE', 'SUSPEND']),
+  action: z.enum(['BAN', 'UNBAN', 'ACTIVATE', 'SUSPEND', 'DELETE']),
   reason: z.string().max(500).optional(),
 });
 
