@@ -30,6 +30,7 @@ async function main() {
         referralCode: 'ADMIN001',
         status: UserStatus.ACTIVE,
         autoTradeStatus: false,
+	emailVerified: true,
       },
     });
 
