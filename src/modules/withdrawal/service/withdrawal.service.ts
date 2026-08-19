@@ -55,7 +55,7 @@ export class WithdrawalService {
     // Calculate fee (2% flat)
     const fee = amount * WITHDRAWAL_FEE_PERCENTAGE;
 
-    // Calculate penalty (30% if withdrawing from principal before 90 days)
+    // Calculate penalty (10% if withdrawing from principal before 90 days)
     // Lock period is counted from the user's FIRST approved deposit date
     let penalty = 0;
     if (walletType === WalletType.PRINCIPAL) {
@@ -134,7 +134,7 @@ export class WithdrawalService {
         debit: penalty,
         beforeBalance: currentBalance,
         afterBalance: afterPenaltyBalance,
-        description: `Early withdrawal penalty (30%)`,
+        description: `Early withdrawal penalty (10%)`,
         referenceType: 'WITHDRAWAL',
       });
       currentBalance = afterPenaltyBalance;
