@@ -61,7 +61,7 @@ export class BlockchainController {
   async getTransactionReceipt(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const transactionHash = req.params.hash;
-      const network = req.query.network as string || 'bsc-testnet';
+      const network = req.query.network as string || (process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet');
       
       const receipt = await blockchainService.getTransactionReceipt(transactionHash, network);
       
@@ -87,7 +87,7 @@ export class BlockchainController {
    */
   async checkNetworkHealth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const network = req.query.network as string || 'bsc-testnet';
+      const network = req.query.network as string || (process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet');
       const healthy = await blockchainService.checkNetworkHealth(network);
       
       res.status(200).json({

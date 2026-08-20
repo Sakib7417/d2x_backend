@@ -303,7 +303,7 @@ export class PoolBonusService {
             penalty: 0,
             netAmount: amount,
             destinationAddress: request.destinationAddress,
-            network: request.network || 'BSC-Testnet',
+            network: request.network || process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet',
             status: 'PENDING',
           },
         });

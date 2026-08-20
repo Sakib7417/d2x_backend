@@ -14,7 +14,8 @@ export class BlockchainService {
    * Get provider for network
    */
   private getProvider(network: string) {
-    const networkConfig = NETWORKS[network as keyof typeof NETWORKS] || NETWORKS['bsc-testnet'];
+    const activeNetwork = (process.env.BLOCKCHAIN_NETWORK as keyof typeof NETWORKS) || 'bsc-mainnet';
+    const networkConfig = NETWORKS[network as keyof typeof NETWORKS] || NETWORKS[activeNetwork] || NETWORKS['bsc-mainnet'];
     const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || networkConfig.rpcUrl;
     return new ethers.JsonRpcProvider(rpcUrl);
   }
@@ -194,7 +195,7 @@ export class BlockchainService {
   /**
    * Get wallet balance (native token)
    */
-  async getBalance(address: string, network: string = 'bsc-testnet'): Promise<string> {
+  async getBalance(address: string, network: string = process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet'): Promise<string> {
     const provider = this.getProvider(network);
     const balance = await provider.getBalance(address);
     return ethers.formatEther(balance);
@@ -206,7 +207,7 @@ export class BlockchainService {
   async getTokenBalance(
     address: string,
     tokenContract: string,
-    network: string = 'bsc-testnet'
+    network: string = process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet'
   ): Promise<string> {
     const contract = this.getContract(tokenContract, network);
     const balance = await contract.balanceOf(address);
@@ -218,7 +219,7 @@ export class BlockchainService {
    */
   async getTransactionReceipt(
     transactionHash: string,
-    network: string = 'bsc-testnet'
+    network: string = process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet'
   ): Promise<TransactionReceipt | null> {
     try {
       const provider = this.getProvider(network);
@@ -247,7 +248,7 @@ export class BlockchainService {
   /**
    * Check network health
    */
-  async checkNetworkHealth(network: string = 'bsc-testnet'): Promise<boolean> {
+  async checkNetworkHealth(network: string = process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet'): Promise<boolean> {
     try {
       const provider = this.getProvider(network);
       const blockNumber = await provider.getBlockNumber();

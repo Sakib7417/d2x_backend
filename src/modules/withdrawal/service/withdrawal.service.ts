@@ -149,7 +149,7 @@ export class WithdrawalService {
       penalty,
       netAmount,
       destinationAddress: data.walletAddress,
-      network: data.network || 'BSC-Testnet',
+      network: data.network || process.env.BLOCKCHAIN_NETWORK || 'bsc-mainnet',
       status: WithdrawalStatus.PENDING,
     });
 
