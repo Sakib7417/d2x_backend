@@ -7,7 +7,7 @@ export const DEPOSIT_ERRORS = {
   VERIFICATION_FAILED: 'Deposit verification failed',
   ALREADY_VERIFIED: 'Deposit already verified',
   ALREADY_APPROVED: 'Deposit already approved',
-  CANNOT_APPROVE_PENDING: 'Cannot approve pending deposit',
+  CANNOT_APPROVE_PENDING: 'Cannot approve rejected or already approved deposit',
   INVALID_STATUS: 'Invalid deposit status',
 } as const;
 
@@ -19,5 +19,6 @@ export const DEPOSIT_SUCCESS = {
 } as const;
 
 export const MINIMUM_DEPOSIT = 50;
+export const FEE_TOLERANCE_USD = 0.1; // Allow up to $0.10 shortfall due to token fees/slippage
 export const DEPOSIT_BONUS_PERCENTAGE = 0.05; // 5%
 export const DEPOSIT_BONUS_THRESHOLD = 50;

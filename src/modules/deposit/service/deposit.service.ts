@@ -6,7 +6,14 @@ import { referralService } from '../../referral/service/referral.service';
 import { rankService } from '../../rank/service/rank.service';
 import { settingsRepository } from '../../settings/repository/settings.repository';
 import prisma from '../../../config/database';
-import { DEPOSIT_ERRORS, MINIMUM_DEPOSIT, DEPOSIT_BONUS_PERCENTAGE } from '../constants/deposit.constants';
+import { ethers } from 'ethers';
+import {
+  DEPOSIT_ERRORS,
+  MINIMUM_DEPOSIT,
+  FEE_TOLERANCE_USD,
+  DEPOSIT_BONUS_PERCENTAGE,
+  DEPOSIT_BONUS_THRESHOLD,
+} from '../constants/deposit.constants';
 import {
   SPONSOR_TRADE_BONUS_DEPOSIT_MIN,
   SPONSOR_TRADE_BONUS_DURATION_DAYS,
@@ -123,9 +130,32 @@ export class DepositService {
       throw new UpstreamError('Blockchain transaction verification failed: ' + verificationResult.error);
     }
 
-    // Update deposit with blockchain data
+    // The user should receive at least the declared amount. Token transfer
+    // fees/slippage can cause a small shortfall, so we allow up to
+    // FEE_TOLERANCE_USD. If the on-chain amount is larger, the user gets the
+    // larger value.
+    const transferEvent = verificationResult.transferEvent;
+    const actualAmount = Number(ethers.formatUnits(transferEvent.value, 18));
+    const declaredAmount = Number(deposit.amount);
+    const shortfall = declaredAmount - actualAmount;
+
+    if (shortfall > FEE_TOLERANCE_USD) {
+      throw new BadRequestError(
+        `Received amount ${actualAmount} is less than declared amount ${declaredAmount} by more than ${FEE_TOLERANCE_USD} USDT`,
+      );
+    }
+
+    const finalAmount = Math.max(declaredAmount, actualAmount);
+    const bonusAmount =
+      finalAmount > DEPOSIT_BONUS_THRESHOLD
+        ? finalAmount * DEPOSIT_BONUS_PERCENTAGE
+        : 0;
+
+    // Update deposit with blockchain data and the final credited amount
     await depositRepository.update(deposit.id, {
       status: DepositStatus.VERIFIED,
+      amount: finalAmount,
+      bonusAmount,
       blockNumber: verificationResult.transaction ? BigInt(verificationResult.transaction.blockNumber) : undefined,
       confirmations: verificationResult.transaction ? verificationResult.transaction.confirmations : 12,
       blockchainData: verificationResult.transaction as any,
@@ -152,8 +182,10 @@ export class DepositService {
       throw new ConflictError(DEPOSIT_ERRORS.ALREADY_APPROVED);
     }
 
-    // Must be verified first
-    if (deposit.status !== DepositStatus.VERIFIED) {
+    // Allow manual admin approval for pending deposits and normal approval
+    // for verified deposits. Rejected or already approved deposits cannot
+    // be approved again.
+    if (deposit.status !== DepositStatus.PENDING && deposit.status !== DepositStatus.VERIFIED) {
       throw new ConflictError(DEPOSIT_ERRORS.CANNOT_APPROVE_PENDING);
     }
 

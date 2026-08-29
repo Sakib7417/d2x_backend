@@ -88,9 +88,10 @@ export class BlockchainService {
         throw new BadRequestError(BLOCKCHAIN_ERRORS.INVALID_ADDRESS);
       }
 
-      // Validate amount (USDT has 18 decimals)
-      const expectedAmount = ethers.parseUnits(amount, 18);
-      if (transferEvent.value !== expectedAmount) {
+      // Validate a positive transfer amount. The exact value check (including
+      // fee tolerance) is handled by the deposit service using the on-chain
+      // transfer event value.
+      if (transferEvent.value <= 0n) {
         throw new BadRequestError(BLOCKCHAIN_ERRORS.INVALID_AMOUNT);
       }
 

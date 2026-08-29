@@ -163,9 +163,10 @@ export class DepositRepository {
     data: {
       status?: DepositStatus;
       transactionHash?: string;
+      amount?: number;
+      bonusAmount?: number;
       blockNumber?: bigint;
       confirmations?: number;
-      bonusAmount?: number;
       blockchainData?: any;
       verifiedAt?: Date;
       approvedAt?: Date;
