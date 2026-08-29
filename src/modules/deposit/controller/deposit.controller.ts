@@ -159,13 +159,14 @@ export class DepositController {
     try {
       const id = req.params.id;
       const user = (req as any).user;
+      const { transactionHash } = req.body || {};
       const deposit = await depositService.getDepositById(id);
 
       if (deposit.userId !== user.userId && user.role !== 'ADMIN') {
         throw new ForbiddenError('You are not authorized to verify this deposit');
       }
 
-      const result = await depositService.verifyDeposit(id);
+      const result = await depositService.verifyDeposit(id, transactionHash);
 
       res.status(200).json({
         success: true,

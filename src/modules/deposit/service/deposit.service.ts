@@ -80,10 +80,11 @@ export class DepositService {
   }
 
   /**
-   * Verify deposit with blockchain
+   * Verify deposit with blockchain. Optionally override the stored
+   * transaction hash so the user can re-enter a correct one.
    */
-  async verifyDeposit(depositId: string) {
-    const deposit = await depositRepository.findById(depositId);
+  async verifyDeposit(depositId: string, overrideTransactionHash?: string) {
+    let deposit = await depositRepository.findById(depositId);
     if (!deposit) {
       throw new NotFoundError(DEPOSIT_ERRORS.DEPOSIT_NOT_FOUND);
     }
@@ -93,9 +94,24 @@ export class DepositService {
       throw new ConflictError(DEPOSIT_ERRORS.ALREADY_VERIFIED);
     }
 
+    let txHashToVerify = deposit.transactionHash;
+
+    // Allow the user to correct a wrong/missing transaction hash before verifying
+    if (overrideTransactionHash && overrideTransactionHash !== deposit.transactionHash) {
+      if (!/^0x[a-fA-F0-9]{64}$/.test(overrideTransactionHash)) {
+        throw new BadRequestError(DEPOSIT_ERRORS.INVALID_TRANSACTION_HASH);
+      }
+
+      await depositRepository.update(deposit.id, {
+        transactionHash: overrideTransactionHash,
+      });
+
+      txHashToVerify = overrideTransactionHash;
+    }
+
     // Verify transaction with blockchain service
     const verificationResult = await blockchainService.verifyTransaction({
-      transactionHash: deposit.transactionHash,
+      transactionHash: txHashToVerify,
       toAddress: deposit.receiverAddress,
       amount: deposit.amount.toString(),
       tokenContract: deposit.tokenContract,
