@@ -42,6 +42,13 @@ router.get('/statistics', authenticate, depositController.getStatistics.bind(dep
 router.get('/:id', authenticate, depositController.getDepositById.bind(depositController));
 
 /**
+ * @route   POST /api/v1/deposit/:id/verify
+ * @desc    Verify deposit (owner or admin)
+ * @access  Private
+ */
+router.post('/:id/verify', authenticate, depositController.verifyDeposit.bind(depositController));
+
+/**
  * @route   POST /api/v1/deposit/:id/approve
  * @desc    Approve deposit (admin)
  * @access  Admin

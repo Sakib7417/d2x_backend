@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { depositService } from '../service/deposit.service';
 import { CreateDepositInput } from '../validator/deposit.validator';
 import { DepositStatus } from '@prisma/client';
+import { ForbiddenError } from '../../../utils/errors';
 
 export class DepositController {
   /**
@@ -145,6 +146,31 @@ export class DepositController {
         success: true,
         message: 'Deposit rejected successfully',
         data: deposit,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Verify deposit (owner or admin)
+   */
+  async verifyDeposit(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id;
+      const user = (req as any).user;
+      const deposit = await depositService.getDepositById(id);
+
+      if (deposit.userId !== user.userId && user.role !== 'ADMIN') {
+        throw new ForbiddenError('You are not authorized to verify this deposit');
+      }
+
+      const result = await depositService.verifyDeposit(id);
+
+      res.status(200).json({
+        success: true,
+        message: 'Deposit verified successfully',
+        data: result,
       });
     } catch (error) {
       next(error);
