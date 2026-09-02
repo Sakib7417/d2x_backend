@@ -29,3 +29,8 @@ export interface TradeTimeDTO {
 export interface TradeScheduleDTO {
   morning: TradeTimeDTO;
 }
+
+export interface AddTradeExclusionDTO {
+  userId: string;
+  reason?: string;
+}

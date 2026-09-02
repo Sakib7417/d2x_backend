@@ -11,7 +11,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../../../utils/errors';
-import { UserActionDTO, ListQueryDTO, UpdateConfigDTO, TradeScheduleDTO } from '../dto/admin.dto';
+import { UserActionDTO, ListQueryDTO, UpdateConfigDTO, TradeScheduleDTO, AddTradeExclusionDTO } from '../dto/admin.dto';
 
 const serializeAdminData = (value: unknown): unknown => {
   if (value instanceof Prisma.Decimal) return value.toString();
@@ -140,6 +140,70 @@ export class AdminService {
     await settingsService.upsert('MORNING_TRADE_TIME', morning, adminId, 'Daily trade execution time', 'TRADING');
     await cronService.rescheduleTradeTasks();
     return this.getTradeSchedule();
+  }
+
+  async getTradingStatus() {
+    const [enabled, schedule] = await Promise.all([
+      settingsRepository.isTradingEnabled(),
+      this.getTradeSchedule(),
+    ]);
+    return { enabled, schedule };
+  }
+
+  async toggleTrading(adminId: string, enabled: boolean) {
+    await settingsService.upsert('TRADING_ENABLED', String(enabled), adminId, 'Global trading enabled/disabled switch', 'TRADING');
+    return { enabled };
+  }
+
+  async listTradeExclusions(query: ListQueryDTO) {
+    const page = Number(query.page ?? 1);
+    const limit = Number(query.limit ?? 20);
+
+    const [exclusions, total] = await Promise.all([
+      prisma.tradeExclusion.findMany({
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true, autoTradeStatus: true, status: true } },
+        },
+      }),
+      prisma.tradeExclusion.count(),
+    ]);
+
+    return {
+      exclusions: serializeAdminData(exclusions),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async addTradeExclusion(_adminId: string, data: AddTradeExclusionDTO) {
+    const user = await prisma.user.findUnique({ where: { id: data.userId } });
+    if (!user) throw new NotFoundError(ADMIN_ERRORS.USER_NOT_FOUND);
+    if (user.role === 'ADMIN') throw new BadRequestError('Cannot modify admin users');
+
+    return prisma.tradeExclusion.upsert({
+      where: { userId: data.userId },
+      update: { reason: data.reason },
+      create: {
+        userId: data.userId,
+        reason: data.reason,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  async removeTradeExclusion(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundError(ADMIN_ERRORS.USER_NOT_FOUND);
+
+    await prisma.tradeExclusion.deleteMany({ where: { userId } });
+    return { userId, excluded: false };
   }
 
   private getListOptions(query: ListQueryDTO) {

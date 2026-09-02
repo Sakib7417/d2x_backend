@@ -43,6 +43,12 @@ export class SettingsRepository {
     const morning = (await this.findByKey('MORNING_TRADE_TIME'))?.value || process.env.MORNING_TRADE_TIME || '09:00';
     return { morning };
   }
+
+  async isTradingEnabled(): Promise<boolean> {
+    const setting = await this.findByKey('TRADING_ENABLED');
+    const value = setting?.value ?? process.env.TRADING_ENABLED ?? 'false';
+    return value === 'true' || value === '1';
+  }
 }
 
 export const settingsRepository = new SettingsRepository();

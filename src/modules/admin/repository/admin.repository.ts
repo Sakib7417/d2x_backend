@@ -47,6 +47,7 @@ const adminUserSelect = {
   wallets: true,
   govIdType: true,
   govIdUrl: true,
+  isContentCreator: true,
 } as const;
 
 export class AdminRepository {

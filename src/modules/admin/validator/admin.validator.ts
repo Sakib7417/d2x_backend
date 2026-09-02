@@ -26,7 +26,18 @@ export const updateTradeScheduleSchema = z.object({
   morning: timeStringSchema,
 });
 
+export const toggleTradingSchema = z.object({
+  enabled: z.boolean(),
+});
+
+export const addTradeExclusionSchema = z.object({
+  userId: z.string().uuid(),
+  reason: z.string().max(500).optional(),
+});
+
 export type UserActionInput = z.infer<typeof userActionSchema>;
 export type AdminListQueryInput = z.infer<typeof listQuerySchema>;
 export type UpdateConfigInput = z.infer<typeof updateConfigSchema>;
 export type UpdateTradeScheduleInput = z.infer<typeof updateTradeScheduleSchema>;
+export type ToggleTradingInput = z.infer<typeof toggleTradingSchema>;
+export type AddTradeExclusionInput = z.infer<typeof addTradeExclusionSchema>;

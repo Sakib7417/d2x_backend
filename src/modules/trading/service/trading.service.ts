@@ -1,6 +1,7 @@
 import { tradingRepository } from '../repository/trading.repository';
 import { walletService } from '../../wallet/service/wallet.service';
 import { ledgerService } from '../../ledger/service/ledger.service';
+import { settingsRepository } from '../../settings/repository/settings.repository';
 import prisma from '../../../config/database';
 import { NotFoundError } from '../../../utils/errors';
 import { TradeQueryDTO } from '../types/trading.types';
@@ -13,6 +14,16 @@ export class TradingService {
    * Rule: Each trade uses 1% of Principal Wallet. Duration: 2 Minutes.
    */
   async executeTradeSession(tradeType: TradeType = TradeType.MORNING) {
+    const isEnabled = await settingsRepository.isTradingEnabled();
+    if (!isEnabled) {
+      console.log('[TRADE] Trading is globally disabled. Skipping session.');
+      return { totalExecuted: 0, trades: [] };
+    }
+
+    // Load excluded user ids before scanning eligible users
+    const exclusions = await prisma.tradeExclusion.findMany({ select: { userId: true } });
+    const excludedIds = new Set(exclusions.map((exclusion: { userId: string }) => exclusion.userId));
+
     // Find all users with autoTradeStatus = true
     const eligibleUsers = await prisma.user.findMany({
       where: {
@@ -26,6 +37,10 @@ export class TradingService {
     const settlementTime = new Date(now.getTime() + 2 * 60 * 1000); // 2 minutes later
 
     for (const user of eligibleUsers) {
+      if (excludedIds.has(user.id)) {
+        continue;
+      }
+
       try {
         // Fetch Principal Wallet Balance
         const principalBalance = await walletService.getBalance(user.id, WalletType.PRINCIPAL);

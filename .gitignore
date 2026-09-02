@@ -44,8 +44,6 @@ out/
 *~
 .DS_Store
 
-# Prisma
-prisma/migrations/
 
 # Testing
 .nyc_output/

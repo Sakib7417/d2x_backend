@@ -39,6 +39,7 @@ export class SettingsService {
       { key: 'MINIMUM_DEPOSIT', value: process.env.MINIMUM_DEPOSIT || '50', description: 'Minimum USDT deposit amount', category: 'BLOCKCHAIN' },
       { key: 'DEPOSIT_BONUS_PERCENTAGE', value: process.env.DEPOSIT_BONUS_PERCENTAGE || '5', description: 'Deposit bonus percentage', category: 'REFERRAL' },
       { key: 'DEPOSIT_BONUS_THRESHOLD', value: process.env.DEPOSIT_BONUS_THRESHOLD || '50', description: 'Deposit bonus threshold', category: 'REFERRAL' },
+      { key: 'TRADING_ENABLED', value: process.env.TRADING_ENABLED || 'false', description: 'Global trading enabled/disabled switch', category: 'TRADING' },
       { key: 'TRADE_PERCENTAGE', value: process.env.TRADE_PERCENTAGE || '1', description: 'Percentage of principal used per trade', category: 'TRADING' },
       { key: 'TRADE_DURATION_MINUTES', value: process.env.TRADE_DURATION_MINUTES || '2', description: 'Trade settlement duration', category: 'TRADING' },
       { key: 'MORNING_TRADE_TIME', value: process.env.MORNING_TRADE_TIME || '09:00', description: 'Morning trade execution time', category: 'TRADING' },

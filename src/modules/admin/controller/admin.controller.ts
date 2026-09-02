@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { adminService } from '../service/admin.service';
 import { UserActionDTO, UpdateConfigDTO } from '../dto/admin.dto';
-import { listQuerySchema, UpdateTradeScheduleInput } from '../validator/admin.validator';
+import { listQuerySchema, UpdateTradeScheduleInput, ToggleTradingInput, AddTradeExclusionInput } from '../validator/admin.validator';
 
 export class AdminController {
   async getDashboardStats(req: Request, res: Response, next: NextFunction) {
@@ -177,6 +177,56 @@ export class AdminController {
       const data: UpdateTradeScheduleInput = req.body;
       const result = await adminService.updateTradeSchedule(adminId, data.morning);
       res.status(200).json({ success: true, message: 'Trade schedule updated', data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getTradingStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await adminService.getTradingStatus();
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async toggleTrading(req: Request, res: Response, next: NextFunction) {
+    try {
+      const adminId = (req as any).user.userId;
+      const data: ToggleTradingInput = req.body;
+      const result = await adminService.toggleTrading(adminId, data.enabled);
+      res.status(200).json({ success: true, message: `Trading ${result.enabled ? 'enabled' : 'disabled'}`, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listTradeExclusions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await adminService.listTradeExclusions(listQuerySchema.parse(req.query));
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addTradeExclusion(req: Request, res: Response, next: NextFunction) {
+    try {
+      const adminId = (req as any).user.userId;
+      const data: AddTradeExclusionInput = req.body;
+      const result = await adminService.addTradeExclusion(adminId, data);
+      res.status(200).json({ success: true, message: 'User excluded from trading', data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async removeTradeExclusion(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.params;
+      const result = await adminService.removeTradeExclusion(userId);
+      res.status(200).json({ success: true, message: 'User removed from trading exclusion', data: result });
     } catch (error) {
       next(error);
     }
