@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client';
+import { UserRole, WalletType } from '@prisma/client';
 
 export interface UserActionDTO {
   userId: string;
@@ -33,4 +33,11 @@ export interface TradeScheduleDTO {
 export interface AddTradeExclusionDTO {
   userId: string;
   reason?: string;
+}
+
+export interface GiveRewardDTO {
+  userId: string;
+  amount: number;
+  walletType: WalletType;
+  reason: string;
 }

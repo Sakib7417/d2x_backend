@@ -121,12 +121,31 @@ export class RankService {
       throw new NotFoundError('User not found');
     }
 
-    const rankRecord = await rankRepository.findByUserId(userId);
-    const history = await rankRepository.findHistoryByUserId(userId);
+    const [rankRecord, referralRecord, history] = await Promise.all([
+      rankRepository.findByUserId(userId),
+      prisma.referral.findUnique({ where: { userId } }),
+      rankRepository.findHistoryByUserId(userId),
+    ]);
+
+    // Rank records are only written when a promotion happens, so for users
+    // still at LV1 rankDetails is null — and even when present its counts are
+    // a stale snapshot. Overlay live referral counts so the UI always shows
+    // the user's actual team numbers.
+    const rankDetails = rankRecord
+      ? {
+          ...rankRecord,
+          directReferrals: referralRecord?.directReferralCount ?? rankRecord.directReferrals,
+          teamSize: referralRecord?.teamSize ?? rankRecord.teamSize,
+        }
+      : {
+          level: user.rank,
+          directReferrals: referralRecord?.directReferralCount ?? 0,
+          teamSize: referralRecord?.teamSize ?? 0,
+        };
 
     return {
       currentRank: user.rank,
-      rankDetails: rankRecord,
+      rankDetails,
       history,
     };
   }

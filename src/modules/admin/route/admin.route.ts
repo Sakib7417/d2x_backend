@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { adminController } from '../controller/admin.controller';
 import { validateQuery, validateRequest } from '../../../middlewares/validation.middleware';
 import { authenticate, authorize } from '../../../middlewares/auth.middleware';
-import { listQuerySchema, userActionSchema, updateConfigSchema, updateTradeScheduleSchema, toggleTradingSchema, addTradeExclusionSchema } from '../validator/admin.validator';
+import { listQuerySchema, userActionSchema, updateConfigSchema, updateTradeScheduleSchema, toggleTradingSchema, addTradeExclusionSchema, giveRewardSchema } from '../validator/admin.validator';
 
 const router = Router();
 
@@ -10,6 +10,7 @@ router.get('/dashboard', authenticate, authorize('ADMIN'), adminController.getDa
 router.get('/analytics', authenticate, authorize('ADMIN'), adminController.getAnalytics.bind(adminController));
 router.get('/users', authenticate, authorize('ADMIN'), validateQuery(listQuerySchema), adminController.listUsers.bind(adminController));
 router.get('/users/:userId', authenticate, authorize('ADMIN'), adminController.getUserDetail.bind(adminController));
+router.get('/users/:userId/team', authenticate, authorize('ADMIN'), adminController.getUserTeam.bind(adminController));
 router.get('/deposits', authenticate, authorize('ADMIN'), validateQuery(listQuerySchema), adminController.listDeposits.bind(adminController));
 router.get('/withdrawals', authenticate, authorize('ADMIN'), validateQuery(listQuerySchema), adminController.listWithdrawals.bind(adminController));
 router.get('/trades', authenticate, authorize('ADMIN'), validateQuery(listQuerySchema), adminController.listTrades.bind(adminController));
@@ -22,6 +23,7 @@ router.get('/notifications', authenticate, authorize('ADMIN'), validateQuery(lis
 router.get('/audit-logs', authenticate, authorize('ADMIN'), validateQuery(listQuerySchema), adminController.listAuditLogs.bind(adminController));
 router.get('/settings', authenticate, authorize('ADMIN'), validateQuery(listQuerySchema), adminController.listSettings.bind(adminController));
 router.post('/users/action', authenticate, authorize('ADMIN'), validateRequest(userActionSchema), adminController.manageUser.bind(adminController));
+router.post('/users/reward', authenticate, authorize('ADMIN'), validateRequest(giveRewardSchema), adminController.giveReward.bind(adminController));
 router.put('/config', authenticate, authorize('ADMIN'), validateRequest(updateConfigSchema), adminController.updateConfig.bind(adminController));
 router.get('/trade-schedule', authenticate, authorize('ADMIN'), adminController.getTradeSchedule.bind(adminController));
 router.put('/trade-schedule', authenticate, authorize('ADMIN'), validateRequest(updateTradeScheduleSchema), adminController.updateTradeSchedule.bind(adminController));

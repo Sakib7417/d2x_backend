@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { adminService } from '../service/admin.service';
 import { UserActionDTO, UpdateConfigDTO } from '../dto/admin.dto';
-import { listQuerySchema, UpdateTradeScheduleInput, ToggleTradingInput, AddTradeExclusionInput } from '../validator/admin.validator';
+import { listQuerySchema, UpdateTradeScheduleInput, ToggleTradingInput, AddTradeExclusionInput, GiveRewardInput } from '../validator/admin.validator';
 
 export class AdminController {
   async getDashboardStats(req: Request, res: Response, next: NextFunction) {
@@ -35,6 +35,16 @@ export class AdminController {
     try {
       const { userId } = req.params;
       const result = await adminService.getUserDetail(userId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUserTeam(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.params;
+      const result = await adminService.getUserTeam(userId);
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -146,6 +156,17 @@ export class AdminController {
       const data: UserActionDTO = req.body;
       const result = await adminService.manageUser(adminId, data);
       res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async giveReward(req: Request, res: Response, next: NextFunction) {
+    try {
+      const adminId = (req as any).user.userId;
+      const data: GiveRewardInput = req.body;
+      const result = await adminService.giveReward(adminId, data);
+      res.status(200).json({ success: true, message: 'Reward credited to user wallet', data: result });
     } catch (error) {
       next(error);
     }

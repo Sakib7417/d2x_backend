@@ -35,9 +35,25 @@ export const addTradeExclusionSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
+// ADMIN_COMMISSION is excluded — rewards go to user wallets only
+export const giveRewardSchema = z.object({
+  userId: z.string().uuid(),
+  amount: z.coerce.number().positive().max(1_000_000),
+  walletType: z.enum([
+    'PRINCIPAL',
+    'DEPOSIT_BONUS',
+    'REFERRAL',
+    'TRADING_PROFIT',
+    'RANK_BONUS',
+    'POOL_BONUS',
+  ]),
+  reason: z.string().min(1).max(500),
+});
+
 export type UserActionInput = z.infer<typeof userActionSchema>;
 export type AdminListQueryInput = z.infer<typeof listQuerySchema>;
 export type UpdateConfigInput = z.infer<typeof updateConfigSchema>;
 export type UpdateTradeScheduleInput = z.infer<typeof updateTradeScheduleSchema>;
 export type ToggleTradingInput = z.infer<typeof toggleTradingSchema>;
 export type AddTradeExclusionInput = z.infer<typeof addTradeExclusionSchema>;
+export type GiveRewardInput = z.infer<typeof giveRewardSchema>;

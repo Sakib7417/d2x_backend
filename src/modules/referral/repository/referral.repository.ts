@@ -198,9 +198,10 @@ export class ReferralRepository {
     totalBonuses: number;
     totalBonusAmount: number;
   }> {
-    const [totalReferrals, directReferrals, totalBonuses, totalBonusAmount] = await Promise.all([
+    const [userReferral, directReferrals, totalBonuses, totalBonusAmount] = await Promise.all([
+      // teamSize tracks the entire downline, not just directs
+      prisma.referral.findUnique({ where: { userId } }),
       prisma.referral.count({ where: { sponsorId: userId } }),
-      prisma.referral.count({ where: { sponsorId: userId, level: 1 } }),
       prisma.referralBonus.count({ where: { userId } }),
       prisma.referralBonus.aggregate({
         where: { userId },
@@ -209,7 +210,7 @@ export class ReferralRepository {
     ]);
 
     return {
-      totalReferrals,
+      totalReferrals: userReferral?.teamSize ?? directReferrals,
       directReferrals,
       totalBonuses,
       totalBonusAmount: Number(totalBonusAmount._sum.bonusAmount || 0),

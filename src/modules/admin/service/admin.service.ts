@@ -1,9 +1,14 @@
-import { Prisma } from '@prisma/client';
+import { LedgerType, NotificationType, Prisma, ReferenceType, Referral } from '@prisma/client';
 import { adminRepository } from '../repository/admin.repository';
 import { userRepository } from '../../users/repository/user.repository';
 import { settingsService } from '../../settings/service/settings.service';
 import { settingsRepository } from '../../settings/repository/settings.repository';
 import { cronService } from '../../cron/cron.service';
+import { walletService } from '../../wallet/service/wallet.service';
+import { walletRepository } from '../../wallet/repository/wallet.repository';
+import { referralRepository } from '../../referral/repository/referral.repository';
+import { ledgerService } from '../../ledger/service/ledger.service';
+import { notificationService } from '../../notifications/service/notification.service';
 import { ADMIN_ERRORS } from '../constants/admin.constants';
 import prisma from '../../../config/database';
 import {
@@ -11,7 +16,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../../../utils/errors';
-import { UserActionDTO, ListQueryDTO, UpdateConfigDTO, TradeScheduleDTO, AddTradeExclusionDTO } from '../dto/admin.dto';
+import { UserActionDTO, ListQueryDTO, UpdateConfigDTO, TradeScheduleDTO, AddTradeExclusionDTO, GiveRewardDTO } from '../dto/admin.dto';
 
 const serializeAdminData = (value: unknown): unknown => {
   if (value instanceof Prisma.Decimal) return value.toString();
@@ -70,6 +75,45 @@ export class AdminService {
     return serializeAdminData(await adminRepository.listReferrals(this.getListOptions(query)));
   }
 
+  /**
+   * Team members under a user (all levels up to 5) with each member's
+   * approved deposit total — powers the per-member investment breakdown
+   * on the admin referrals page.
+   */
+  async getUserTeam(userId: string) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError(ADMIN_ERRORS.USER_NOT_FOUND);
+
+    const referrals = (await referralRepository.findAllBySponsorId(userId, 5)) as Array<
+      Referral & { user?: { id: string; name: string | null; email: string; createdAt: Date } | null }
+    >;
+    const memberIds = referrals.map((r) => r.userId);
+
+    const depositSums = memberIds.length
+      ? await prisma.deposit.groupBy({
+          by: ['userId'],
+          where: { userId: { in: memberIds }, status: 'APPROVED' },
+          _sum: { amount: true },
+        })
+      : [];
+    const investedByUser = new Map(
+      depositSums.map((d) => [d.userId, Number(d._sum.amount || 0)]),
+    );
+
+    return serializeAdminData({
+      members: referrals.map((r) => ({
+        id: r.id,
+        userId: r.userId,
+        level: r.level,
+        investedAmount: investedByUser.get(r.userId) ?? 0,
+        directReferralCount: r.directReferralCount,
+        teamSize: r.teamSize,
+        joinedAt: r.user?.createdAt,
+        user: r.user ? { id: r.user.id, name: r.user.name, email: r.user.email } : null,
+      })),
+    });
+  }
+
   async listRanks(query: ListQueryDTO) {
     return serializeAdminData(await adminRepository.listRanks(this.getListOptions(query)));
   }
@@ -118,6 +162,50 @@ export class AdminService {
     }
 
     return serializeAdminData(await userRepository.updateStatus(data.userId, status));
+  }
+
+  /**
+   * Manually credit a reward to a user's wallet. Records an ADJUSTMENT ledger
+   * entry (so it shows in the user's transaction history) and notifies the user.
+   */
+  async giveReward(adminId: string, data: GiveRewardDTO) {
+    const user = await userRepository.findById(data.userId);
+    if (!user) throw new NotFoundError(ADMIN_ERRORS.USER_NOT_FOUND);
+    if (user.role === 'ADMIN') throw new ForbiddenError(ADMIN_ERRORS.CANNOT_MODIFY_ADMIN);
+    if (!(data.amount > 0)) throw new BadRequestError('Reward amount must be positive');
+
+    const existing = await walletRepository.findByUserIdAndType(data.userId, data.walletType);
+    if (!existing) {
+      await walletRepository.createWallet(data.userId, data.walletType);
+    }
+
+    const walletResult = await walletService.creditWallet(data.userId, data.walletType, data.amount);
+
+    const entry = await ledgerService.createEntry({
+      userId: data.userId,
+      walletId: walletResult.wallet.id,
+      type: LedgerType.ADJUSTMENT,
+      credit: data.amount,
+      debit: 0,
+      beforeBalance: walletResult.beforeBalance,
+      afterBalance: walletResult.afterBalance,
+      description: `Admin reward - ${data.reason}`,
+      referenceType: ReferenceType.SYSTEM,
+      metadata: { kind: 'ADMIN_REWARD', adminId, reason: data.reason },
+    });
+
+    await notificationService.sendToUser(
+      data.userId,
+      NotificationType.SYSTEM,
+      'Reward credited',
+      `You received a reward of ${data.amount} USDT in your ${data.walletType} wallet. Reason: ${data.reason}`,
+      { amount: data.amount, walletType: data.walletType, reason: data.reason, ledgerId: entry.id },
+    );
+
+    return serializeAdminData({
+      wallet: walletResult.wallet,
+      ledger: entry,
+    });
   }
 
   async updateConfig(adminId: string, data: UpdateConfigDTO) {
