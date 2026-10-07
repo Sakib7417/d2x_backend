@@ -67,6 +67,7 @@ async function main() {
             previousLevel: u.rank,
             newLevel: target,
             changeReason: 'Rank corrected to earned level (rank rules fix)',
+            changedAt: new Date(),
           },
         });
 
