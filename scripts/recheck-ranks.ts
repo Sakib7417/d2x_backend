@@ -8,9 +8,11 @@
  * - RankHistory records the correction for audit
  * - Idempotent: safe to re-run
  */
-import { PrismaClient, RankLevel, UserRole } from '@prisma/client';
+import { PrismaClient, RankLevel, UserRole, WalletType, LedgerType, ReferenceType } from '@prisma/client';
 import { RANK_DEFINITIONS, RANK_ORDER } from '../src/modules/rank/constants/rank.constants';
 import { rankRepository } from '../src/modules/rank/repository/rank.repository';
+import { walletService } from '../src/modules/wallet/service/wallet.service';
+import { ledgerService } from '../src/modules/ledger/service/ledger.service';
 
 const prisma = new PrismaClient();
 
@@ -36,6 +38,53 @@ async function eligibleRank(userId: string): Promise<RankLevel> {
   return RankLevel.NONE;
 }
 
+// Sum of rank bonuses deserved for all levels <= rank
+function deservedBonus(rank: RankLevel): number {
+  return RANK_ORDER.filter((l) => indexOf(l) <= indexOf(rank)).reduce(
+    (sum, l) => sum + RANK_DEFINITIONS[l].rankBonus,
+    0,
+  );
+}
+
+// Reverse unearned rank bonus already credited to RANK_BONUS wallet
+async function clawbackUnearnedBonus(userId: string): Promise<number> {
+  const rankRec = await prisma.rank.findUnique({ where: { userId } });
+  const totalEarned = Number(rankRec?.totalRankBonusEarned ?? 0);
+  const deserved = deservedBonus((await prisma.user.findUnique({ where: { id: userId }, select: { rank: true } }))!.rank);
+  const toClawback = totalEarned - deserved;
+  if (toClawback <= 0) return 0;
+
+  const wallet = await prisma.wallet.findUnique({
+    where: { userId_type: { userId, type: WalletType.RANK_BONUS } },
+  });
+  const available = Number(wallet?.balance ?? 0);
+  const debitAmount = Math.min(toClawback, available);
+
+  if (debitAmount > 0 && wallet) {
+    const result = await walletService.debitWallet(userId, WalletType.RANK_BONUS, debitAmount);
+    await ledgerService.createEntry({
+      userId,
+      walletId: result.wallet.id,
+      type: LedgerType.RANK_BONUS,
+      credit: 0,
+      debit: debitAmount,
+      beforeBalance: result.beforeBalance,
+      afterBalance: result.afterBalance,
+      description: 'Rank bonus reversed — rank corrected to earned level',
+      referenceType: ReferenceType.RANK,
+    });
+  }
+
+  if (rankRec) {
+    await prisma.rank.update({
+      where: { id: rankRec.id },
+      data: { totalRankBonusEarned: deserved },
+    });
+  }
+
+  return toClawback;
+}
+
 async function main() {
   const users = await prisma.user.findMany({
     where: { deletedAt: null, role: UserRole.USER },
@@ -44,6 +93,7 @@ async function main() {
   console.log(`Checking ${users.length} users...`);
 
   const corrected: { email: string; from: RankLevel; to: RankLevel }[] = [];
+  const clawbacks: { email: string; amount: number }[] = [];
 
   // Multiple passes: correcting a direct's rank can change the sponsor's
   // eligibility, so iterate until nothing changes (ranks only move down).
@@ -71,7 +121,11 @@ async function main() {
           },
         });
 
-        if (pass === 1) corrected.push({ email: u.email, from: u.rank, to: target });
+        if (!corrected.some((c) => c.email === u.email)) {
+          corrected.push({ email: u.email, from: u.rank, to: target });
+        } else {
+          corrected.find((c) => c.email === u.email)!.to = target;
+        }
         u.rank = target;
         changed++;
       }
@@ -81,9 +135,20 @@ async function main() {
     if (changed === 0) break;
   }
 
+  // After ranks stabilise, reverse unearned bonuses (final rank decides
+  // how much bonus was truly deserved)
+  for (const u of users) {
+    const clawed = await clawbackUnearnedBonus(u.id);
+    if (clawed > 0) clawbacks.push({ email: u.email, amount: clawed });
+  }
+
   console.log('\nCorrected users:');
   for (const c of corrected) console.log(`  ${c.email}: ${c.from} -> ${c.to}`);
   console.log(`\nTotal corrected: ${corrected.length}`);
+
+  console.log('\nBonus clawbacks:');
+  for (const c of clawbacks) console.log(`  ${c.email}: ${c.amount} USDT reversed`);
+  console.log(`\nTotal clawed back: ${clawbacks.reduce((s, c) => s + c.amount, 0)} USDT`);
 }
 
 main()
