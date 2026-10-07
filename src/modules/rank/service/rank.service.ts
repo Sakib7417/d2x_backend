@@ -27,8 +27,9 @@ export class RankService {
     const directLv1Count = await rankRepository.countDirectReferralsWithMinRank(userId, RankLevel.LV1);
     const teamSize = await rankRepository.countTeamSize(userId);
 
-    // Evaluate target rank from LV7 down to LV1
-    let targetRank: RankLevel = RankLevel.LV1;
+    // Evaluate target rank from LV7 down to LV1. Defaults to the current
+    // rank so a NONE user who doesn't qualify for LV1 stays NONE.
+    let targetRank: RankLevel = currentRank;
 
     for (let i = RANK_ORDER.length - 1; i >= 0; i--) {
       const levelKey = RANK_ORDER[i];
@@ -95,18 +96,17 @@ export class RankService {
           referenceType: ReferenceType.RANK,
         });
       }
-
-      // Re-evaluate sponsor up the chain
-      if (user.sponsorId) {
-        this.evaluateUserRank(user.sponsorId).catch((err) => {
-          console.error(`Error re-evaluating sponsor ${user.sponsorId}:`, err);
-        });
-      }
-
-      return newRank;
     }
 
-    return currentRank;
+    // Re-evaluate sponsor up the chain on every evaluation — a downline's
+    // deposit may qualify the sponsor even when this user didn't upgrade.
+    if (user.sponsorId) {
+      this.evaluateUserRank(user.sponsorId).catch((err) => {
+        console.error(`Error re-evaluating sponsor ${user.sponsorId}:`, err);
+      });
+    }
+
+    return targetIndex > currentIndex ? targetRank : currentRank;
   }
 
   /**
@@ -121,31 +121,84 @@ export class RankService {
       throw new NotFoundError('User not found');
     }
 
-    const [rankRecord, referralRecord, history] = await Promise.all([
+    const [
+      rankRecord,
+      referralRecord,
+      history,
+      qualifyingTeamSize,
+      qualifyingDirectCount,
+      directLv1Count,
+    ] = await Promise.all([
       rankRepository.findByUserId(userId),
       prisma.referral.findUnique({ where: { userId } }),
       rankRepository.findHistoryByUserId(userId),
+      rankRepository.countTeamSize(userId),
+      rankRepository.countQualifyingDirectReferrals(userId, RANK_DEFINITIONS[RankLevel.LV1].minDirectDeposit),
+      rankRepository.countDirectReferralsWithMinRank(userId, RankLevel.LV1),
     ]);
 
     // Rank records are only written when a promotion happens, so for users
-    // still at LV1 rankDetails is null — and even when present its counts are
-    // a stale snapshot. Overlay live referral counts so the UI always shows
-    // the user's actual team numbers.
+    // with no achieved rank rankDetails is null — and even when present its
+    // counts are a stale snapshot. Overlay live counts so the UI always shows
+    // the user's actual team numbers. teamSize counts only members with an
+    // approved deposit, matching the rank eligibility rule.
     const rankDetails = rankRecord
       ? {
           ...rankRecord,
           directReferrals: referralRecord?.directReferralCount ?? rankRecord.directReferrals,
-          teamSize: referralRecord?.teamSize ?? rankRecord.teamSize,
+          teamSize: qualifyingTeamSize,
         }
       : {
           level: user.rank,
           directReferrals: referralRecord?.directReferralCount ?? 0,
-          teamSize: referralRecord?.teamSize ?? 0,
+          teamSize: qualifyingTeamSize,
         };
+
+    // Per-level progress towards each rank — used by the UI to show how
+    // much is left to unlock the next level.
+    const currentIndex = RANK_ORDER.indexOf(user.rank); // NONE → -1
+    const progress = RANK_ORDER.map((level, index) => {
+      const def = RANK_DEFINITIONS[level];
+      const requirements =
+        level === RankLevel.LV1
+          ? [
+              {
+                key: 'qualifyingDirects',
+                label: `Directs with ${def.minDirectDeposit}+ deposit`,
+                required: def.directReferralCount,
+                current: qualifyingDirectCount,
+              },
+            ]
+          : [
+              {
+                key: 'directLv1',
+                label: 'Directs ranked LV1 or above',
+                required: def.directLv1Count,
+                current: directLv1Count,
+              },
+              {
+                key: 'teamSize',
+                label: 'Deposited team members',
+                required: def.teamSize,
+                current: qualifyingTeamSize,
+              },
+            ];
+
+      return {
+        level,
+        name: def.name,
+        achieved: index <= currentIndex,
+        isNext: index === currentIndex + 1,
+        requirements: requirements.map((r) => ({ ...r, met: r.current >= r.required })),
+        rankBonus: def.rankBonus,
+        cycleBonus: def.cycleBonus,
+      };
+    });
 
     return {
       currentRank: user.rank,
       rankDetails,
+      progress,
       history,
     };
   }

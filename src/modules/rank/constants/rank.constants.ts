@@ -12,6 +12,16 @@ export interface RankDefinition {
 }
 
 export const RANK_DEFINITIONS: Record<RankLevel, RankDefinition> = {
+  [RankLevel.NONE]: {
+    level: RankLevel.NONE,
+    name: 'No Rank',
+    directReferralCount: 0,
+    minDirectDeposit: 0,
+    directLv1Count: 0,
+    teamSize: 0,
+    rankBonus: 0,
+    cycleBonus: 0,
+  },
   [RankLevel.LV1]: {
     level: RankLevel.LV1,
     name: 'Level 1',

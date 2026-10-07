@@ -1,5 +1,6 @@
 import { PrismaClient, Rank, RankHistory, RankLevel } from '@prisma/client';
 import prisma from '../../../config/database';
+import { RANK_ORDER } from '../constants/rank.constants';
 
 export class RankRepository {
   /**
@@ -113,16 +114,19 @@ export class RankRepository {
    * Count direct referrals with rank >= minRank
    */
   async countDirectReferralsWithMinRank(userId: string, minRank: RankLevel): Promise<number> {
+    const qualifyingRanks = RANK_ORDER.slice(RANK_ORDER.indexOf(minRank));
+
     return prisma.user.count({
       where: {
         sponsorId: userId,
-        rank: minRank,
+        rank: { in: qualifyingRanks },
       },
     });
   }
 
   /**
-   * Count total team size across all downline levels
+   * Count team size across all downline levels (only members who have
+   * at least one APPROVED deposit — non-depositing members don't count)
    */
   async countTeamSize(userId: string): Promise<number> {
     let teamCount = 0;
@@ -133,11 +137,18 @@ export class RankRepository {
         where: {
           sponsorId: { in: currentLevelUserIds },
         },
-        select: { id: true },
+        select: {
+          id: true,
+          deposits: {
+            where: { status: 'APPROVED' },
+            select: { id: true },
+            take: 1,
+          },
+        },
       });
 
       if (nextLevelUsers.length === 0) break;
-      teamCount += nextLevelUsers.length;
+      teamCount += nextLevelUsers.filter((u) => u.deposits.length > 0).length;
       currentLevelUserIds = nextLevelUsers.map((u) => u.id);
     }
 

@@ -18,7 +18,7 @@ model User {
   referralCode            String               @unique
   sponsorId               String?              @map("sponsor_id")
   walletAddress           String?
-  rank                    RankLevel            @default(LV1)
+  rank                    RankLevel            @default(NONE)
   autoTradeStatus         Boolean              @default(false)
   status                  UserStatus           @default(INACTIVE)
   isContentCreator        Boolean              @default(false) @map("is_content_creator")
@@ -644,6 +644,7 @@ enum TradeType {
 }
 
 enum RankLevel {
+  NONE
   LV1
   LV2
   LV3
