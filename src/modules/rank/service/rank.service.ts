@@ -62,7 +62,14 @@ export class RankService {
         data: { rank: newRank },
       });
 
-      // 2. Upsert Rank record
+      // 2. Check if this level was already achieved before (e.g. user was
+      // corrected down and re-qualified) — rank bonus pays only once per level
+      const alreadyAchieved = await prisma.rankHistory.findFirst({
+        where: { userId, newLevel: newRank },
+        select: { id: true },
+      });
+
+      // 3. Upsert Rank record
       await rankRepository.upsertUserRank({
         userId,
         level: newRank,
@@ -70,10 +77,10 @@ export class RankService {
         teamSize,
         directLv1Count,
         achievedAt: new Date(),
-        rankBonusEarned: rankBonus,
+        rankBonusEarned: alreadyAchieved ? 0 : rankBonus,
       });
 
-      // 3. Create RankHistory record
+      // 4. Create RankHistory record
       await rankRepository.createRankHistory({
         userId,
         previousLevel: currentRank,
@@ -81,8 +88,8 @@ export class RankService {
         changeReason: `Upgraded to ${newRank}`,
       });
 
-      // 4. Credit Rank Bonus Wallet
-      if (rankBonus > 0) {
+      // 5. Credit Rank Bonus Wallet
+      if (rankBonus > 0 && !alreadyAchieved) {
         const creditResult = await walletService.creditWallet(userId, WalletType.RANK_BONUS, rankBonus);
         await ledgerService.createEntry({
           userId,
