@@ -104,6 +104,7 @@ export class AdminService {
       members: referrals.map((r) => ({
         id: r.id,
         userId: r.userId,
+        sponsorId: r.sponsorId,
         level: r.level,
         investedAmount: investedByUser.get(r.userId) ?? 0,
         directReferralCount: r.directReferralCount,
