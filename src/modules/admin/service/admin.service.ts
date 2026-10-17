@@ -1,4 +1,4 @@
-import { LedgerType, NotificationType, Prisma, ReferenceType, Referral } from '@prisma/client';
+import { LedgerType, NotificationType, Prisma, RankLevel, ReferenceType, Referral } from '@prisma/client';
 import { adminRepository } from '../repository/admin.repository';
 import { userRepository } from '../../users/repository/user.repository';
 import { settingsService } from '../../settings/service/settings.service';
@@ -16,7 +16,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../../../utils/errors';
-import { UserActionDTO, ListQueryDTO, UpdateConfigDTO, TradeScheduleDTO, AddTradeExclusionDTO, GiveRewardDTO } from '../dto/admin.dto';
+import { UserActionDTO, ListQueryDTO, UpdateConfigDTO, TradeScheduleDTO, AddTradeExclusionDTO, GiveRewardDTO, UpdateRankDTO } from '../dto/admin.dto';
 
 const serializeAdminData = (value: unknown): unknown => {
   if (value instanceof Prisma.Decimal) return value.toString();
@@ -85,7 +85,7 @@ export class AdminService {
     if (!user) throw new NotFoundError(ADMIN_ERRORS.USER_NOT_FOUND);
 
     const referrals = (await referralRepository.findAllBySponsorId(userId, 5)) as Array<
-      Referral & { user?: { id: string; name: string | null; email: string; createdAt: Date } | null }
+      Referral & { user?: { id: string; name: string | null; email: string; rank: RankLevel; createdAt: Date } | null }
     >;
     const memberIds = referrals.map((r) => r.userId);
 
@@ -109,7 +109,7 @@ export class AdminService {
         directReferralCount: r.directReferralCount,
         teamSize: r.teamSize,
         joinedAt: r.user?.createdAt,
-        user: r.user ? { id: r.user.id, name: r.user.name, email: r.user.email } : null,
+        user: r.user ? { id: r.user.id, name: r.user.name, email: r.user.email, rank: r.user.rank } : null,
       })),
     });
   }
@@ -162,6 +162,41 @@ export class AdminService {
     }
 
     return serializeAdminData(await userRepository.updateStatus(data.userId, status));
+  }
+
+  /**
+   * Admin override of a user's rank — corrects ranks that don't match actual
+   * qualification. Syncs the Rank record (drives cycle/pool bonus) and writes
+   * a RankHistory entry for audit. No rank bonus is credited; corrections only.
+   */
+  async updateUserRank(userId: string, data: UpdateRankDTO) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError(ADMIN_ERRORS.USER_NOT_FOUND);
+    if (user.role === 'ADMIN') throw new ForbiddenError(ADMIN_ERRORS.CANNOT_MODIFY_ADMIN);
+    if (user.rank === data.level) return serializeAdminData(user);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { rank: data.level } });
+
+      const rankRec = await tx.rank.findUnique({ where: { userId } });
+      if (rankRec) {
+        await tx.rank.update({ where: { id: rankRec.id }, data: { level: data.level } });
+      } else if (data.level !== 'NONE') {
+        await tx.rank.create({ data: { userId, level: data.level, achievedAt: new Date() } });
+      }
+
+      await tx.rankHistory.create({
+        data: {
+          userId,
+          previousLevel: user.rank,
+          newLevel: data.level,
+          changeReason: data.reason || `Rank set to ${data.level} by admin`,
+          changedAt: new Date(),
+        },
+      });
+    });
+
+    return serializeAdminData(await userRepository.findById(userId));
   }
 
   /**

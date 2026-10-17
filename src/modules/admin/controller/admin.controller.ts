@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { adminService } from '../service/admin.service';
-import { UserActionDTO, UpdateConfigDTO } from '../dto/admin.dto';
+import { UserActionDTO, UpdateConfigDTO, UpdateRankDTO } from '../dto/admin.dto';
 import { listQuerySchema, UpdateTradeScheduleInput, ToggleTradingInput, AddTradeExclusionInput, GiveRewardInput } from '../validator/admin.validator';
 
 export class AdminController {
@@ -155,6 +155,17 @@ export class AdminController {
       const adminId = (req as any).user.userId;
       const data: UserActionDTO = req.body;
       const result = await adminService.manageUser(adminId, data);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateUserRank(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.params;
+      const data: UpdateRankDTO = req.body;
+      const result = await adminService.updateUserRank(userId, data);
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);

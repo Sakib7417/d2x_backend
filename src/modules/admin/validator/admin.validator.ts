@@ -50,6 +50,13 @@ export const giveRewardSchema = z.object({
   reason: z.string().min(1).max(500),
 });
 
+// Admin correction of a user's rank — used to fix ranks that don't match
+// actual qualification. No bonus is credited; use the reward endpoint for that.
+export const updateRankSchema = z.object({
+  level: z.enum(['NONE', 'LV1', 'LV2', 'LV3', 'LV4', 'LV5', 'LV6', 'LV7']),
+  reason: z.string().max(500).optional(),
+});
+
 export type UserActionInput = z.infer<typeof userActionSchema>;
 export type AdminListQueryInput = z.infer<typeof listQuerySchema>;
 export type UpdateConfigInput = z.infer<typeof updateConfigSchema>;
@@ -57,3 +64,4 @@ export type UpdateTradeScheduleInput = z.infer<typeof updateTradeScheduleSchema>
 export type ToggleTradingInput = z.infer<typeof toggleTradingSchema>;
 export type AddTradeExclusionInput = z.infer<typeof addTradeExclusionSchema>;
 export type GiveRewardInput = z.infer<typeof giveRewardSchema>;
+export type UpdateRankInput = z.infer<typeof updateRankSchema>;

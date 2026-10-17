@@ -1,4 +1,4 @@
-import { UserRole, WalletType } from '@prisma/client';
+import { RankLevel, UserRole, WalletType } from '@prisma/client';
 
 export interface UserActionDTO {
   userId: string;
@@ -40,4 +40,9 @@ export interface GiveRewardDTO {
   amount: number;
   walletType: WalletType;
   reason: string;
+}
+
+export interface UpdateRankDTO {
+  level: RankLevel;
+  reason?: string;
 }

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { adminController } from '../controller/admin.controller';
 import { validateQuery, validateRequest } from '../../../middlewares/validation.middleware';
 import { authenticate, authorize } from '../../../middlewares/auth.middleware';
-import { listQuerySchema, userActionSchema, updateConfigSchema, updateTradeScheduleSchema, toggleTradingSchema, addTradeExclusionSchema, giveRewardSchema } from '../validator/admin.validator';
+import { listQuerySchema, userActionSchema, updateConfigSchema, updateTradeScheduleSchema, toggleTradingSchema, addTradeExclusionSchema, giveRewardSchema, updateRankSchema } from '../validator/admin.validator';
 
 const router = Router();
 
@@ -24,6 +24,7 @@ router.get('/audit-logs', authenticate, authorize('ADMIN'), validateQuery(listQu
 router.get('/settings', authenticate, authorize('ADMIN'), validateQuery(listQuerySchema), adminController.listSettings.bind(adminController));
 router.post('/users/action', authenticate, authorize('ADMIN'), validateRequest(userActionSchema), adminController.manageUser.bind(adminController));
 router.post('/users/reward', authenticate, authorize('ADMIN'), validateRequest(giveRewardSchema), adminController.giveReward.bind(adminController));
+router.put('/users/:userId/rank', authenticate, authorize('ADMIN'), validateRequest(updateRankSchema), adminController.updateUserRank.bind(adminController));
 router.put('/config', authenticate, authorize('ADMIN'), validateRequest(updateConfigSchema), adminController.updateConfig.bind(adminController));
 router.get('/trade-schedule', authenticate, authorize('ADMIN'), adminController.getTradeSchedule.bind(adminController));
 router.put('/trade-schedule', authenticate, authorize('ADMIN'), validateRequest(updateTradeScheduleSchema), adminController.updateTradeSchedule.bind(adminController));
